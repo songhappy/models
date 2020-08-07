@@ -321,15 +321,36 @@ def run_ncf(_):
 
       history = keras_model.fit(
           train_input_dataset,
-          epochs=FLAGS.train_epochs,
+          epochs=1,
           steps_per_epoch=steps_per_epoch,
           callbacks=callbacks,
           validation_data=eval_input_dataset,
           validation_steps=num_eval_steps,
           verbose=2)
 
-      logging.info("Training done. Start evaluating")
+      filepath = "/Users/guoqiong/intelWork/git/tensorflow/tf-models/models/ncf"
+      #keras_model.saved_model(filepath)
+      tf.saved_model.save(keras_model, filepath)
+      import numpy as np
+      a = np.full(shape=(1000,),fill_value=1, dtype=np.int32)
+      b = np.full(shape=(1000,),fill_value=1, dtype=np.int32)
+      c = np.full(shape=(1000,),fill_value=1, dtype=np.int32)
+      d = np.full(shape=(1000,),fill_value=1, dtype=np.int32)
+      e = np.full(shape=(1000,),fill_value=1, dtype=np.int32)
+      testinput =[a,b,c,d,e]
+      print(keras_model.predict_on_batch(testinput))
+      a = np.full(shape=(1,), fill_value=1, dtype=np.int32)
+      b = np.full(shape=(1,), fill_value=1, dtype=np.int32)
+      c = np.full(shape=(1,), fill_value=1, dtype=np.int32)
+      d = np.full(shape=(1,), fill_value=1, dtype=np.int32)
+      e = np.full(shape=(1,), fill_value=1, dtype=np.int32)
+      print(keras_model.predict(testinput))
 
+      logging.info("Training done. Start evaluating")
+      print(eval_input_dataset)
+      print(type(eval_input_dataset))
+      import sys
+      sys.exit()
       eval_loss_and_metrics = keras_model.evaluate(
           eval_input_dataset, steps=num_eval_steps, verbose=2)
 
@@ -348,6 +369,7 @@ def run_ncf(_):
         train_loss = train_history["loss"][-1]
 
   stats = build_stats(train_loss, eval_results, time_callback)
+
   return stats
 
 
