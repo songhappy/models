@@ -15,12 +15,17 @@
 # ==============================================================================
 """A common dataset reader."""
 
+import random
 from typing import Any, Callable, List, Optional
 
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
 from official.modeling.hyperparams import config_definitions as cfg
+
+
+def _get_random_integer():
+  return random.randint(0, (1 << 31) - 1)
 
 
 class InputReader:
@@ -107,6 +112,7 @@ class InputReader:
     self._parser_fn = parser_fn
     self._transform_and_batch_fn = transform_and_batch_fn
     self._postprocess_fn = postprocess_fn
+    self._seed = _get_random_integer()
 
   def _read_sharded_files(
       self,
@@ -117,7 +123,17 @@ class InputReader:
       dataset = tf.data.Dataset.from_tensor_slices(self._shards)
     else:
       dataset = tf.data.Dataset.list_files(
-          self._input_patterns, shuffle=self._is_training)
+          self._input_patterns,
+          seed=self._seed,
+          shuffle=self._is_training)
+
+    # Shuffle and repeat at file level.
+    if self._shards and self._is_training:
+      dataset = dataset.shuffle(
+          len(self._shards),
+          seed=self._seed,
+          reshuffle_each_iteration=True)
+
     if self._sharding and input_context and (
         input_context.num_input_pipelines > 1):
       dataset = dataset.shard(input_context.num_input_pipelines,

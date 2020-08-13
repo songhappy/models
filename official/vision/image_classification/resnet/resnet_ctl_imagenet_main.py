@@ -17,6 +17,7 @@
 import math
 import os
 
+# Import libraries
 from absl import app
 from absl import flags
 from absl import logging
@@ -167,6 +168,7 @@ def run(flags_obj):
       steps_per_loop=steps_per_loop,
       checkpoint_manager=checkpoint_manager,
       summary_interval=summary_interval,
+      summary_dir=flags_obj.model_dir,
       eval_summary_dir=os.path.join(flags_obj.model_dir, 'eval'))
 
   time_callback.on_train_begin()

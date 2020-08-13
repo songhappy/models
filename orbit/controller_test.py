@@ -221,7 +221,10 @@ class TestTrainerWithSummaries(standard_runner.StandardTrainer):
         self.strategy.experimental_distribute_datasets_from_function(dataset_fn)
     )
     standard_runner.StandardTrainer.__init__(
-        self, train_dataset, use_tpu_summary_optimization=True)
+        self,
+        train_dataset,
+        options=standard_runner.StandardTrainerOptions(
+            use_tpu_summary_optimization=True))
 
   def build_train_dataset(self):
     return self.strategy.experimental_distribute_datasets_from_function(
@@ -290,6 +293,56 @@ class ControllerTest(tf.test.TestCase, parameterized.TestCase):
     test_controller.train_and_evaluate(
         train_steps=10, eval_steps=2, eval_interval=6)
     self.assertEqual(test_runner.global_step, 10)
+
+  def test_has_checkpoint_no_summaries(self):
+    test_runner = TestRunner()
+    # Has checkpoint, but no summary directories.
+    checkpoint = tf.train.Checkpoint(model=test_runner.model)
+    checkpoint_manager = tf.train.CheckpointManager(
+        checkpoint,
+        self.model_dir,
+        max_to_keep=None,
+        step_counter=test_runner.global_step)
+    test_controller = controller.Controller(
+        trainer=test_runner,
+        evaluator=test_runner,
+        global_step=test_runner.global_step,
+        checkpoint_manager=checkpoint_manager,
+        steps_per_loop=2)
+    test_controller.train_and_evaluate(
+        train_steps=10, eval_steps=2, eval_interval=6)
+    self.assertEqual(test_runner.global_step, 10)
+
+    # No summaries are saved.
+    self.assertEmpty(tf.io.gfile.glob(
+        os.path.join(checkpoint_manager.directory, "events.*")))
+
+  def test_has_checkpoint_eval_summary_only(self):
+    test_runner = TestRunner()
+    # Has checkpoint, but no summary directories.
+    checkpoint = tf.train.Checkpoint(model=test_runner.model)
+    checkpoint_manager = tf.train.CheckpointManager(
+        checkpoint,
+        self.model_dir,
+        max_to_keep=None,
+        step_counter=test_runner.global_step)
+    test_controller = controller.Controller(
+        trainer=test_runner,
+        evaluator=test_runner,
+        global_step=test_runner.global_step,
+        checkpoint_manager=checkpoint_manager,
+        eval_summary_dir=os.path.join(self.model_dir, "summaries/eval"),
+        steps_per_loop=2)
+    test_controller.train_and_evaluate(
+        train_steps=10, eval_steps=2, eval_interval=6)
+    self.assertEqual(test_runner.global_step, 10)
+
+    # Training summaries are not saved.
+    self.assertEmpty(tf.io.gfile.glob(
+        os.path.join(checkpoint_manager.directory, "events.*")))
+    # Evaluation summaries are saved.
+    self.assertNotEmpty(tf.io.gfile.glob(
+        os.path.join(self.model_dir, "summaries/eval/events.*")))
 
   @parameterized.named_parameters(("return_numpy", True),
                                   ("return_tensor", False))
@@ -609,13 +662,14 @@ class ControllerTest(tf.test.TestCase, parameterized.TestCase):
         evaluator=test_runner,
         global_step=test_runner.global_step,
         steps_per_loop=10,
-        checkpoint_manager=checkpoint_manager)
+        checkpoint_manager=checkpoint_manager,
+        summary_dir=self.model_dir)
     test_controller.train_and_evaluate(
         train_steps=10, eval_steps=2, eval_interval=5)
 
-    # Expect 3 checkpoints to be saved at step: 0, 5, 10.
+    # Expect 3 checkpoints to be saved at step: 5, 10.
     self.assertLen(
-        tf.io.gfile.glob(os.path.join(self.model_dir, "ckpt-*.data*")), 3)
+        tf.io.gfile.glob(os.path.join(self.model_dir, "ckpt-*.data*")), 2)
     # Expect evaluation is performed 2 times at step: 5, 10.
     self.assertLen(
         summaries_with_matching_keyword("eval_loss", self.model_dir), 2)

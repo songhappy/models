@@ -27,13 +27,13 @@ import tensorflow_hub as hub
 
 from official.core import base_task
 from official.core import task_factory
+from official.modeling import tf_utils
 from official.modeling.hyperparams import base_config
 from official.modeling.hyperparams import config_definitions as cfg
 from official.nlp.configs import encoders
 from official.nlp.data import data_loader_factory
 from official.nlp.modeling import models
 from official.nlp.tasks import utils
-
 
 METRIC_TYPES = frozenset(
     ['accuracy', 'matthews_corrcoef', 'pearson_spearman_corr'])
@@ -44,8 +44,7 @@ class ModelConfig(base_config.Config):
   """A classifier/regressor configuration."""
   num_classes: int = 0
   use_encoder_pooler: bool = False
-  encoder: encoders.TransformerEncoderConfig = (
-      encoders.TransformerEncoderConfig())
+  encoder: encoders.EncoderConfig = encoders.EncoderConfig()
 
 
 @dataclasses.dataclass
@@ -85,15 +84,14 @@ class SentencePredictionTask(base_task.Task):
     if self._hub_module:
       encoder_network = utils.get_encoder_from_hub(self._hub_module)
     else:
-      encoder_network = encoders.instantiate_encoder_from_cfg(
-          self.task_config.model.encoder)
-
+      encoder_network = encoders.build_encoder(self.task_config.model.encoder)
+    encoder_cfg = self.task_config.model.encoder.get()
     # Currently, we only support bert-style sentence prediction finetuning.
     return models.BertClassifier(
         network=encoder_network,
         num_classes=self.task_config.model.num_classes,
         initializer=tf.keras.initializers.TruncatedNormal(
-            stddev=self.task_config.model.encoder.initializer_range),
+            stddev=encoder_cfg.initializer_range),
         use_encoder_pooler=self.task_config.model.use_encoder_pooler)
 
   def build_losses(self, labels, model_outputs, aux_losses=None) -> tf.Tensor:
@@ -105,7 +103,7 @@ class SentencePredictionTask(base_task.Task):
 
     if aux_losses:
       loss += tf.add_n(aux_losses)
-    return tf.reduce_mean(loss)
+    return tf_utils.safe_mean(loss)
 
   def build_inputs(self, params, input_context=None):
     """Returns tf.data.Dataset for sentence_prediction task."""
@@ -138,7 +136,8 @@ class SentencePredictionTask(base_task.Task):
       metrics = [tf.keras.metrics.MeanSquaredError()]
     else:
       metrics = [
-          tf.keras.metrics.SparseCategoricalAccuracy(name='cls_accuracy')]
+          tf.keras.metrics.SparseCategoricalAccuracy(name='cls_accuracy')
+      ]
     return metrics
 
   def process_metrics(self, metrics, labels, model_outputs):

@@ -71,9 +71,11 @@ class Controller:
         `trainer.train` function will always be enabled. If set, the value
         should be divisible by steps_per_loop.
       summary_dir: The directory to restore and write checkpoints and summaries.
-        If None, it will be set to `checkpoint_manager.directory`.
+        For example, You can set it to `checkpoint_manager.directory`.
+        If None, it will not write training summarizes.
       eval_summary_dir: The directory to write eval summaries. If None, it will
-        be set to `summary_dir`.
+        be set to `summary_dir`. If both `summary_dir` and `eval_summary_dir`
+        are None, it will not write evaluation summarizes.
 
     Raises:
       ValueError: If both `trainer` and `evaluator` are None.
@@ -108,9 +110,6 @@ class Controller:
     self.global_step = global_step
     self.checkpoint_manager = checkpoint_manager
 
-    if summary_dir is None and checkpoint_manager:
-      summary_dir = checkpoint_manager.directory
-
     if self.trainer is not None:
       self.step_timer = None
       self.steps_per_loop = steps_per_loop
@@ -118,7 +117,6 @@ class Controller:
       self.summary_manager = utils.SummaryManager(
           summary_dir, tf.summary.scalar, global_step=self.global_step)
 
-    eval_summary_writer = None
     if self.evaluator is not None:
       eval_summary_dir = eval_summary_dir or summary_dir
       if eval_summary_dir == summary_dir and self.trainer is not None:
@@ -136,13 +134,9 @@ class Controller:
     # TODO(momernick): We probably only want to do this on certain occasions?
     if self.checkpoint_manager is not None:
       checkpoint_interval = self.checkpoint_manager.checkpoint_interval
-      model_restored = self.restore_checkpoint()
-      if not model_restored and (checkpoint_interval and
-                                 self.trainer is not None):
-        # If the model is not restored from a checkpoint, and
-        # `checkpoint_interval` is enabled for training, save an initial
-        # checkpoint.
-        self.save_checkpoint()
+      restored_path = self.restore_checkpoint()
+      if restored_path:
+        logging.info("Restored from checkpoint: %s", restored_path)
 
   def train(self, steps: int, checkpoint_at_completion: bool = True):
     """Runs training.
