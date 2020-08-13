@@ -44,7 +44,7 @@ from official.utils.misc import model_helpers
 
 
 FLAGS = flags.FLAGS
-
+import tensorflow as tf; print(tf.__version__)
 
 def metric_fn(logits, dup_mask, match_mlperf):
   dup_mask = tf.cast(dup_mask, tf.float32)
@@ -307,7 +307,7 @@ def run_ncf(_):
           num_eval_steps,
           generate_input_online=generate_input_online)
     else:
-      keras_model.compile(optimizer=optimizer, run_eagerly=FLAGS.run_eagerly)
+      keras_model.compile(optimizer=optimizer)#, run_eagerly=FLAGS.run_eagerly)
 
       if not FLAGS.ml_perf:
         # Create Tensorboard summary and checkpoint callbacks.
@@ -329,22 +329,24 @@ def run_ncf(_):
           verbose=2)
 
       filepath = "/Users/guoqiong/intelWork/git/tensorflow/tf-models/models/ncf"
-      #keras_model.saved_model(filepath)
       tf.saved_model.save(keras_model, filepath)
+
       import numpy as np
-      a = np.full(shape=(1000,),fill_value=1, dtype=np.int32)
-      b = np.full(shape=(1000,),fill_value=1, dtype=np.int32)
-      c = np.full(shape=(1000,),fill_value=1, dtype=np.int32)
-      d = np.full(shape=(1000,),fill_value=1, dtype=np.int32)
-      e = np.full(shape=(1000,),fill_value=1, dtype=np.int32)
+      a = np.full(shape=(10000,),fill_value=1, dtype=np.int32)
+      b = np.full(shape=(10000,),fill_value=1, dtype=np.int32)
+      c = np.full(shape=(10000,),fill_value=1, dtype=np.int32)
+      d = np.full(shape=(10000,),fill_value=1, dtype=np.int32)
+      e = np.full(shape=(10000,),fill_value=1, dtype=np.int32)
+      testinput0 =[a,b,c,d,e]
+      print(keras_model.predict_on_batch(testinput0))
+      print("-------------------------------")
+      a = np.array([1])
+      b = np.array([1])
+      c = np.array([1])
+      d = np.array([1])
+      e = np.array([1])
       testinput =[a,b,c,d,e]
-      print(keras_model.predict_on_batch(testinput))
-      a = np.full(shape=(1,), fill_value=1, dtype=np.int32)
-      b = np.full(shape=(1,), fill_value=1, dtype=np.int32)
-      c = np.full(shape=(1,), fill_value=1, dtype=np.int32)
-      d = np.full(shape=(1,), fill_value=1, dtype=np.int32)
-      e = np.full(shape=(1,), fill_value=1, dtype=np.int32)
-      print(keras_model.predict(testinput))
+      print(keras_model(testinput))
 
       logging.info("Training done. Start evaluating")
       print(eval_input_dataset)
